@@ -230,6 +230,34 @@ async def download_image_via_browser(page, url):
         return None
 
 
+async def extract_publish_date_via_browser(page, url):
+    """Extract publish date from Medium article page meta tag."""
+    try:
+        log(f"  Fetching publish date from {url[:80]}...")
+        await page.goto(url, wait_until='domcontentloaded', timeout=30000)
+        # Extract from meta tag
+        date_str = await page.evaluate("""
+            () => {
+                const meta = document.querySelector('meta[property=\"article:published_time\"]');
+                if (meta) return meta.getAttribute('content');
+                const meta2 = document.querySelector('meta[name=\"article:published_time\"]');
+                if (meta2) return meta2.getAttribute('content');
+                const time = document.querySelector('time[datetime]');
+                if (time) return time.getAttribute('datetime');
+                const time2 = document.querySelector('time');
+                if (time2) return time2.getAttribute('datetime') || time2.textContent;
+                return null;
+            }
+        """)
+        if not date_str:
+            return None
+        dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
+        return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
+    except Exception as e:
+        log(f"  Error fetching date: {e}")
+        return None
+
+
 def save_image(img_data, idx, url):
     """Save image bytes to disk and return relative path."""
     if len(img_data) < 200:
@@ -536,6 +564,25 @@ async def main(headless=True, force_rescrape=False, chrome_path=None, skip_check
         # Save updated image map
         with open(IMAGE_MAP_FILE, 'w') as f:
             json.dump(image_map, f, indent=2)
+
+        # Step 3c: Fetch publish dates for ALL articles without pubDate
+        articles_without_date = [a for a in articles if not a.get('pubDate')]
+        if articles_without_date:
+            log(f"\nFetching publish dates for {len(articles_without_date)} articles...")
+            dates_fetched = 0
+            for i, article in enumerate(articles_without_date, 1):
+                log(f"  [{i}/{len(articles_without_date)}] {article['title'][:70]}...")
+                pub_date = await extract_publish_date_via_browser(page, article['url'])
+                if pub_date:
+                    article['pubDate'] = pub_date
+                    dates_fetched += 1
+                    log(f"    → {pub_date}")
+                else:
+                    log(f"    → Not found")
+            log(f"Dates fetched: {dates_fetched}/{len(articles_without_date)}")
+            # Save updated articles with dates
+            with open(ARTICLES_FILE, 'w') as f:
+                json.dump(articles, f, indent=2)
 
         if browser:
             await browser.close()
