@@ -58,7 +58,8 @@ jobs:
           git add -f urls.json
           git add -f new_urls.json
           git commit -m "Auto-update: $(date +%Y-%m-%d)" || true
-          git push
+          git pull --rebase origin main || true
+          git push origin main
 
       - name: Create release with DOCX
         if: steps.check.outputs.changed == 'true'
