@@ -4,13 +4,11 @@ const GITHUB_LATEST_DOCX = 'https://github.com/ShubhamPP004/medium/releases/late
 
 export async function GET() {
   try {
-    // Use env var if set, otherwise fallback to GitHub latest release (auto-updates)
-    const externalUrl = process.env.DOCX_DOWNLOAD_URL || GITHUB_LATEST_DOCX;
+    // Always use GitHub latest release URL (auto-updates with each new release)
     return NextResponse.json({
-      externalUrl,
-      message: 'Redirect to external download',
+      externalUrl: GITHUB_LATEST_DOCX,
+      message: 'Redirect to latest release download',
     });
-  } catch (err) {
     console.error('Download error:', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to serve DOCX' },
