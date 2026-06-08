@@ -1,0 +1,78 @@
+name: Update Articles & DOCX
+
+   on:
+     schedule:
+       - cron: '0 6 * * *'  # Daily at 6 AM UTC
+     workflow_dispatch:      # Manual trigger from GitHub UI
+
+   jobs:
+     update:
+       runs-on: ubuntu-latest
+       timeout-minutes: 120
+
+       steps:
+         - name: Checkout repo
+           uses: actions/checkout@v4
+
+         - name: Setup Node.js
+           uses: actions/setup-node@v4
+           with:
+             node-version: '20'
+
+         - name: Setup Python
+           uses: actions/setup-python@v5
+           with:
+             python-version: '3.12'
+
+         - name: Install Node.js dependencies
+           run: npm install -g docx
+
+         - name: Install Python dependencies
+           run: pip install playwright
+
+         - name: Install Playwright browsers
+           run: playwright install chromium
+
+         - name: Cache images
+           uses: actions/cache@v4
+           with:
+             path: images
+             key: images-${{ hashFiles('image_map.json') }}
+             restore-keys: images-
+
+         - name: Run CI updater
+           run: python3 scripts/ci_update.py --headless
+
+         - name: Check for changes
+           id: check
+           run: |
+             if git diff --quiet HEAD; then
+               echo "changed=false" >> $GITHUB_OUTPUT
+             else
+               echo "changed=true" >> $GITHUB_OUTPUT
+             fi
+
+         - name: Commit updated data
+           if: steps.check.outputs.changed == 'true'
+           run: |
+             git config user.name "Auto Update Bot"
+             git config user.email "bot@example.com"
+             git add public/data/
+             git add image_map.json
+             git add urls.json
+             git add new_urls.json
+             git commit -m "Auto-update: $(date +%Y-%m-%d)" || true
+             git push
+
+         - name: Create release with DOCX
+           if: steps.check.outputs.changed == 'true'
+           uses: softprops/action-gh-release@v2
+           with:
+             files: Marketing_Cloud_Next_Public.docx
+             tag_name: v1.0.${{ github.run_number }}
+             name: "Marketing Cloud Next DOCX — v1.0.${{ github.run_number }}"
+             body: |
+               Auto-generated DOCX with all articles from @marketingcloudtips.
+               Updated: ${{ github.event.repository.updated_at }}
+           env:
+             GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
