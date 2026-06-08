@@ -357,21 +357,21 @@ function parseMarkdownToDocx(markdown, imageMap) {
 
 function getTipsNumber(title) {
   const match = title.match(/SFMC Tips #(\d+)/);
-  return match ? parseInt(match[1]) : null;
+  return match ? parseInt(match[1], 10) : null;
 }
 
-function sortArticles(articles) {
+function sortByDate(articles) {
   return articles.sort((a, b) => {
+    const aDate = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+    const bDate = b.pubDate ? new Date(b.pubDate).getTime() : 0;
     const aNum = getTipsNumber(a.title || '');
     const bNum = getTipsNumber(b.title || '');
-    if (aNum !== null && bNum !== null) return aNum - bNum;
-    if (aNum !== null) return -1;
-    if (bNum !== null) return 1;
-    return (a.title || '').localeCompare(b.title || '');
+    return (aDate || aNum || 0) - (bDate || bNum || 0);
   });
 }
 
-const sortedArticles = sortArticles(articles);
+// Sort by publication date (articles with pubDate first, then by tips number for older ones)
+const sortedArticles = sortByDate([...articles]);
 const allChildren = [];
 
 // ===== COVER PAGE =====
@@ -492,10 +492,28 @@ for (let i = 0; i < sortedArticles.length; i++) {
     pageBreakBefore: true
   }));
 
-  // Metadata line
+  // Metadata line (author + date)
   const metaParts = [];
   if (a.byline) {
     metaParts.push(new TextRun({ text: `By ${a.byline}`, italics: true, size: 22, color: '666666' }));
+  }
+  if (a.pubDate) {
+    try {
+      const d = new Date(a.pubDate);
+      const formatted = d.toLocaleString('en-US', {
+        month: 'short', day: 'numeric', year: 'numeric',
+        hour: '2-digit', minute: '2-digit', timeZoneName: 'short'
+      });
+      if (metaParts.length > 0) {
+        metaParts.push(new TextRun({ text: '  |  ', size: 22, color: '999999' }));
+      }
+      metaParts.push(new TextRun({
+        text: `Published: ${formatted}`,
+        italics: true, size: 22, color: '666666'
+      }));
+    } catch (e) {
+      // Skip if date parsing fails
+    }
   }
   allChildren.push(new Paragraph({
     children: metaParts.length > 0 ? metaParts : [new TextRun({ text: ' ', size: 22 })],
