@@ -2,8 +2,11 @@ name: Update Articles & DOCX
 
    on:
      schedule:
-       - cron: '0 6 * * *'  # Daily at 6 AM UTC
-     workflow_dispatch:      # Manual trigger from GitHub UI
+       - cron: '0 6 * * *'
+     workflow_dispatch:
+
+   permissions:
+     contents: write
 
    jobs:
      update:
@@ -24,21 +27,14 @@ name: Update Articles & DOCX
            with:
              python-version: '3.12'
 
-         - name: Install Node.js dependencies
-           run: npm install -g docx
+         - name: Install docx package
+           run: npm install docx
 
          - name: Install Python dependencies
            run: pip install playwright
 
          - name: Install Playwright browsers
            run: playwright install chromium
-
-         - name: Cache images
-           uses: actions/cache@v4
-           with:
-             path: images
-             key: images-${{ hashFiles('image_map.json') }}
-             restore-keys: images-
 
          - name: Run CI updater
            run: python3 scripts/ci_update.py --headless
@@ -70,9 +66,7 @@ name: Update Articles & DOCX
            with:
              files: Marketing_Cloud_Next_Public.docx
              tag_name: v1.0.${{ github.run_number }}
-             name: "Marketing Cloud Next DOCX — v1.0.${{ github.run_number }}"
-             body: |
-               Auto-generated DOCX with all articles from @marketingcloudtips.
-               Updated: ${{ github.event.repository.updated_at }}
+             name: "Marketing Cloud Next DOCX v1.0.${{ github.run_number }}"
+             body: "Auto-generated DOCX with all articles from @marketingcloudtips"
            env:
              GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
