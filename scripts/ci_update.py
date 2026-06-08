@@ -230,27 +230,27 @@ async def download_image_via_browser(page, url):
         return None
 
 
-async def extract_publish_date_via_browser(page, url):
-    """Extract publish date from Medium article page meta tag."""
+async def extract_publish_date_via_api(context, url):
+    """Extract publish date from Medium article page via direct API request."""
     try:
         log(f"  Fetching publish date from {url[:80]}...")
-        await page.goto(url, wait_until='domcontentloaded', timeout=30000)
-        # Extract from meta tag
-        date_str = await page.evaluate("""
-            () => {
-                const meta = document.querySelector('meta[property=\"article:published_time\"]');
-                if (meta) return meta.getAttribute('content');
-                const meta2 = document.querySelector('meta[name=\"article:published_time\"]');
-                if (meta2) return meta2.getAttribute('content');
-                const time = document.querySelector('time[datetime]');
-                if (time) return time.getAttribute('datetime');
-                const time2 = document.querySelector('time');
-                if (time2) return time2.getAttribute('datetime') || time2.textContent;
-                return null;
-            }
-        """)
-        if not date_str:
+        response = await context.request.get(url, headers={
+            'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
+            'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        })
+        if not response.ok:
             return None
+        html = await response.text()
+        # Extract from meta tag in raw HTML
+        match = re.search(r'<meta[^>]+property=["\']article:published_time["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        if not match:
+            match = re.search(r'<meta[^>]+content=["\']([^"\']+)["\'][^>]+property=["\']article:published_time["\']', html, re.IGNORECASE)
+        if not match:
+            match = re.search(r'<time[^>]+datetime=["\']([^"\']+)["\']', html, re.IGNORECASE)
+        if not match:
+            return None
+        date_str = match.group(1)
+        # Convert to RSS format
         dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
     except Exception as e:
@@ -572,7 +572,7 @@ async def main(headless=True, force_rescrape=False, chrome_path=None, skip_check
             dates_fetched = 0
             for i, article in enumerate(articles_without_date, 1):
                 log(f"  [{i}/{len(articles_without_date)}] {article['title'][:70]}...")
-                pub_date = await extract_publish_date_via_browser(page, article['url'])
+                pub_date = await extract_publish_date_via_api(context, article['url'])
                 if pub_date:
                     article['pubDate'] = pub_date
                     dates_fetched += 1
