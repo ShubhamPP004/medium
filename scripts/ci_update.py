@@ -238,9 +238,15 @@ async def extract_publish_date_via_api(context, url):
             'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36',
             'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
         })
+        log(f"    Response status: {response.status}")
         if not response.ok:
+            log(f"    Request failed with status {response.status}")
             return None
         html = await response.text()
+        log(f"    HTML length: {len(html)}")
+        # Check if meta tag exists
+        has_meta = 'article:published_time' in html
+        log(f"    Has meta tag: {has_meta}")
         # Extract from meta tag in raw HTML
         match = re.search(r'<meta[^>]+property=["\']article:published_time["\'][^>]+content=["\']([^"\']+)["\']', html, re.IGNORECASE)
         if not match:
@@ -250,6 +256,7 @@ async def extract_publish_date_via_api(context, url):
         if not match:
             return None
         date_str = match.group(1)
+        log(f"    Found date string: {date_str}")
         # Convert to RSS format
         dt = datetime.fromisoformat(date_str.replace('Z', '+00:00'))
         return dt.strftime('%a, %d %b %Y %H:%M:%S GMT')
