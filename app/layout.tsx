@@ -5,6 +5,9 @@ import ThemeProvider from './ThemeProvider';
 export const metadata: Metadata = {
   title: 'Marketing Cloud Next — Article Collection',
   description: 'Curated articles from @marketingcloudtips. Browse, search, and download the complete collection.',
+  icons: {
+    icon: '/favicon.ico',
+  },
 };
 
 export default function RootLayout({
