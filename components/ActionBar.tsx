@@ -36,37 +36,50 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
   const handleDownload = async () => {
     setDownloading(true);
     setDownloadError(null);
-    
+
     try {
       const res = await fetch('/api/download');
       const data = await res.json().catch(() => null);
-      
-      // External URL redirect
-      if (data?.externalUrl) {
-        window.open(data.externalUrl, '_blank');
-        setDownloading(false);
-        return;
+
+      if (!data?.externalUrl) {
+        throw new Error('Download URL not available');
       }
-      
-      if (!res.ok) {
-        const errorMsg = data?.error || `Download failed: ${res.status}`;
-        const instructions = data?.instructions || '';
-        throw new Error(instructions ? `${errorMsg}\n\n${instructions}` : errorMsg);
+
+      const externalUrl = data.externalUrl;
+
+      // Use File System Access API when available to let user choose overwrite
+      if ('showSaveFilePicker' in window) {
+        try {
+          const fileRes = await fetch(externalUrl);
+          if (!fileRes.ok) {
+            throw new Error(`Failed to fetch: ${fileRes.status}`);
+          }
+          const blob = await fileRes.blob();
+
+          const handle = await (window as any).showSaveFilePicker({
+            suggestedName: 'Marketing_Cloud_Next_Public.docx',
+            startIn: 'downloads',
+            types: [{
+              description: 'Word Document',
+              accept: { 'application/vnd.openxmlformats-officedocument.wordprocessingml.document': ['.docx'] }
+            }]
+          });
+          const writable = await handle.createWritable();
+          await writable.write(blob);
+          await writable.close();
+          setDownloading(false);
+          return;
+        } catch (fsErr: any) {
+          if (fsErr.name === 'AbortError') {
+            setDownloading(false);
+            return; // user cancelled
+          }
+          // fall through to fallback on CORS or other errors
+        }
       }
-      
-      // Local file download
-      if (data === null) {
-        // Response was not JSON, treat as blob
-        const blob = await res.blob();
-        const url = window.URL.createObjectURL(blob);
-        const a = document.createElement('a');
-        a.href = url;
-        a.download = 'Marketing_Cloud_Next_Public.docx';
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        window.URL.revokeObjectURL(url);
-      }
+
+      // Fallback: open in new tab (browser handles download with default behavior)
+      window.open(externalUrl, '_blank');
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
     } finally {
@@ -133,6 +146,11 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
           <span>{checking ? 'Checking...' : 'Check for Updates'}</span>
         </button>
       </div>
+
+      <p className="text-xs text-white/40 text-center">
+        If a file with the same name exists, your browser may append &quot;(1)&quot;.
+        Modern browsers (Chrome/Edge) will open a save dialog where you can choose to overwrite.
+      </p>
 
       {downloadError && (
         <div className="glass rounded-xl p-4 border border-red-500/20 bg-red-500/10">
