@@ -9,6 +9,7 @@ export async function GET() {
       externalUrl: GITHUB_LATEST_DOCX,
       message: 'Redirect to latest release download',
     });
+  } catch (err) {
     console.error('Download error:', err);
     return NextResponse.json(
       { error: err instanceof Error ? err.message : 'Failed to serve DOCX' },
