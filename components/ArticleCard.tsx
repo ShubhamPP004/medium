@@ -22,10 +22,13 @@ export default function ArticleCard({ article, index, isNew }: ArticleCardProps)
   const displayDate = useMemo(() => {
     if (!article.pubDate) return null;
     try {
-      return new Date(article.pubDate).toLocaleDateString('en-US', {
+      const date = new Date(article.pubDate);
+      return date.toLocaleString('en-US', {
         month: 'short',
         day: 'numeric',
         year: 'numeric',
+        hour: '2-digit',
+        minute: '2-digit',
       });
     } catch {
       return null;

@@ -22,7 +22,7 @@ type SortDirection = 'asc' | 'desc';
 
 export default function ArticleList({ articles, newCount }: ArticleListProps) {
   const [search, setSearch] = useState('');
-  const [sortField, setSortField] = useState<SortField>('number');
+  const [sortField, setSortField] = useState<SortField>('date');
   const [sortDirection, setSortDirection] = useState<SortDirection>('asc');
   const [showFilters, setShowFilters] = useState(false);
   const [expanded, setExpanded] = useState(true);
@@ -56,7 +56,12 @@ export default function ArticleList({ articles, newCount }: ArticleListProps) {
         case 'date': {
           const aDate = a.pubDate ? new Date(a.pubDate).getTime() : 0;
           const bDate = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-          comparison = aDate - bDate;
+          // Fallback to tips number for articles without pubDate (oldest articles)
+          const aNumMatch = a.title.match(/SFMC Tips #(\d+)/);
+          const bNumMatch = b.title.match(/SFMC Tips #(\d+)/);
+          const aNum = aNumMatch ? parseInt(aNumMatch[1], 10) : 0;
+          const bNum = bNumMatch ? parseInt(bNumMatch[1], 10) : 0;
+          comparison = (aDate || aNum) - (bDate || bNum);
           break;
         }
       }
