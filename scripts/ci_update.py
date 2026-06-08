@@ -267,44 +267,84 @@ def extract_images_from_html(html):
     return list(set(content_imgs))
 
 
-def html_to_markdown(html):
-    """Convert Medium HTML content to markdown-like text for DOCX generation."""
+def html_to_markdown(html, title=None):
+    """Convert Medium HTML content to markdown-like text for DOCX generation.
+    
+    Args:
+        html: The HTML content from RSS feed
+        title: Full article title (including SFMC Tips # number) to use as heading
+    """
     text = html
 
+    # If title provided, replace first h1 with full title (ensures SFMC Tips # is in heading)
+    if title:
+        first_h1 = re.search(r'<h1[^>]*>(.*?)</h1>', text, flags=re.DOTALL)
+        if first_h1:
+            text = text[:first_h1.start()] + f'<h1>{title}</h1>' + text[first_h1.end():]
+        else:
+            text = f'<h1>{title}</h1>\n' + text
+
+    # Convert images FIRST before any tag stripping
+    # Handle img tags with src (various attribute orders)
+    text = re.sub(r'<img[^>]+src="([^"]+)"[^>]*alt="([^"]*)"[^>]*/?>',
+                  lambda m: f'![{m.group(2)}]({m.group(1)})\n\n',
+                  text, flags=re.DOTALL)
+    text = re.sub(r'<img[^>]+alt="([^"]*)"[^>]*src="([^"]+)"[^>]*/?>',
+                  lambda m: f'![{m.group(1)}]({m.group(2)})\n\n',
+                  text, flags=re.DOTALL)
+    text = re.sub(r'<img[^>]+src="([^"]+)"[^>]*/?>',
+                  lambda m: f'![]({m.group(1)})\n\n',
+                  text, flags=re.DOTALL)
+    text = re.sub(r"<img[^>]+src='([^']+)'[^>]*/?>",
+                  lambda m: f'![]({m.group(1)})\n\n',
+                  text, flags=re.DOTALL)
+
+    # Handle figures - convert to image + caption
+    def figure_repl(m):
+        inner = m.group(1)
+        # Find img src (already converted to markdown above, but check for any remaining)
+        img_match = re.search(r'!\[(.*?)\]\(([^)]+)\)', inner)
+        if img_match:
+            alt = img_match.group(1)
+            src = img_match.group(2)
+            # Find caption
+            caption_match = re.search(r'<figcaption[^>]*>(.*?)</figcaption>', inner, flags=re.DOTALL)
+            if caption_match:
+                caption = re.sub(r'<[^>]+>', '', caption_match.group(1)).strip()
+                return f'![{caption}]({src})\n\n*{caption}*\n\n'
+            return f'![{alt}]({src})\n\n'
+        # No img found, just extract text
+        return re.sub(r'<[^>]+>', '', inner).strip() + '\n\n'
+    text = re.sub(r'<figure[^>]*>(.*?)</figure>', figure_repl, text, flags=re.DOTALL)
+    text = re.sub(r'<figcaption[^>]*>(.*?)</figcaption>', r'\1\n', text, flags=re.DOTALL)
+
+    # Headings
     text = re.sub(r'<h1[^>]*>(.*?)</h1>', r'# \1\n\n', text, flags=re.DOTALL)
     text = re.sub(r'<h2[^>]*>(.*?)</h2>', r'## \1\n\n', text, flags=re.DOTALL)
     text = re.sub(r'<h3[^>]*>(.*?)</h3>', r'### \1\n\n', text, flags=re.DOTALL)
     text = re.sub(r'<h4[^>]*>(.*?)</h4>', r'#### \1\n\n', text, flags=re.DOTALL)
 
+    # Bold / Italic
     text = re.sub(r'<strong[^>]*>(.*?)</strong>', r'**\1**', text, flags=re.DOTALL)
     text = re.sub(r'<b[^>]*>(.*?)</b>', r'**\1**', text, flags=re.DOTALL)
-
     text = re.sub(r'<em[^>]*>(.*?)</em>', r'*\1*', text, flags=re.DOTALL)
     text = re.sub(r'<i[^>]*>(.*?)</i>', r'*\1*', text, flags=re.DOTALL)
 
+    # Links
     def link_repl(m):
         href = m.group(1)
         link_text = re.sub(r'<[^>]+>', '', m.group(2)).strip()
         return f'[{link_text}]({href})'
     text = re.sub(r'<a[^>]+href="([^"]+)"[^>]*>(.*?)</a>', link_repl, text, flags=re.DOTALL)
 
-    def img_repl(m):
-        src = m.group(1)
-        alt = m.group(2) if m.group(2) else 'Image'
-        return f'![{alt}]({src})'
-    text = re.sub(r'<img[^>]+src="([^"]+)"[^>]*alt="([^"]*)"[^>]*/>', img_repl, text, flags=re.DOTALL)
-    text = re.sub(r'<img[^>]+alt="([^"]*)"[^>]*src="([^"]+)"[^>]*/>', lambda m: f'![{m.group(1)}]({m.group(2)})', text, flags=re.DOTALL)
-    text = re.sub(r'<img[^>]+src="([^"]+)"[^>]*/>', lambda m: f'![Image]({m.group(1)})', text, flags=re.DOTALL)
-
-    text = re.sub(r'<figure[^>]*>(.*?)</figure>', r'\1\n', text, flags=re.DOTALL)
-    text = re.sub(r'<figcaption[^>]*>(.*?)</figcaption>', r'\1\n', text, flags=re.DOTALL)
-
+    # Blockquotes
     def blockquote_repl(m):
         inner = re.sub(r'<[^>]+>', '', m.group(1)).strip()
         lines = inner.split('\n')
         return '\n'.join(f'> {line}' for line in lines if line.strip()) + '\n\n'
     text = re.sub(r'<blockquote[^>]*>(.*?)</blockquote>', blockquote_repl, text, flags=re.DOTALL)
 
+    # Lists
     def list_repl(m):
         inner = m.group(1)
         items = re.findall(r'<li[^>]*>(.*?)</li>', inner, flags=re.DOTALL)
@@ -317,14 +357,18 @@ def html_to_markdown(html):
     text = re.sub(r'<ul[^>]*>(.*?)</ul>', list_repl, text, flags=re.DOTALL)
     text = re.sub(r'<ol[^>]*>(.*?)</ol>', list_repl, text, flags=re.DOTALL)
 
+    # Paragraphs (but preserve images that are already in markdown)
     text = re.sub(r'<p[^>]*>(.*?)</p>', lambda m: re.sub(r'<[^>]+>', '', m.group(1)).strip() + '\n\n', text, flags=re.DOTALL)
     text = text.replace('<br>', '\n').replace('<br/>', '\n').replace('<br />', '\n')
 
+    # Code
     text = re.sub(r'<code[^>]*>(.*?)</code>', r'`\1`', text, flags=re.DOTALL)
     text = re.sub(r'<pre[^>]*>(.*?)</pre>', lambda m: '\n'.join('    ' + line for line in m.group(1).split('\n')) + '\n', text, flags=re.DOTALL)
 
+    # Strip remaining HTML tags (but NOT markdown image syntax)
     text = re.sub(r'<[^>]+>', '', text)
 
+    # Clean up empty lines
     lines = text.split('\n')
     cleaned = []
     for line in lines:
@@ -409,11 +453,12 @@ async def main(headless=True, force_rescrape=False, chrome_path=None, skip_check
             for i, rss_article in enumerate(new_articles, 1):
                 log(f"\n[{i}/{len(new_articles)}] Processing: {rss_article['title'][:80]}")
 
-                markdown = html_to_markdown(rss_article['content_html'])
+                # Pass title to ensure heading has full title including SFMC Tips # number
+                markdown = html_to_markdown(rss_article['content_html'], rss_article['title'])
                 all_imgs = extract_images_from_html(rss_article['content_html'])
                 log(f"  Images found: {len(all_imgs)}")
 
-                # Download images via browser
+                # Download images for new article
                 for img_url in all_imgs:
                     if img_url in image_map:
                         continue
@@ -458,6 +503,39 @@ async def main(headless=True, force_rescrape=False, chrome_path=None, skip_check
                 json.dump([a['url'] for a in new_articles], f, indent=2)
 
             log(f"\nTotal articles now: {len(articles)}")
+
+        # Step 3b: Download ALL missing images for ALL articles (ensures complete DOCX)
+        log("\nChecking all articles for missing images...")
+        image_map = json.load(open(IMAGE_MAP_FILE)) if IMAGE_MAP_FILE.exists() else {}
+        next_img_idx = get_next_image_index()
+        total_images = 0
+        downloaded_images = 0
+        skipped_images = 0
+        for article in articles:
+            for img_url in article.get('images', []):
+                total_images += 1
+                if img_url in image_map:
+                    # Check if file actually exists
+                    file_path = REPO_ROOT / image_map[img_url]
+                    if file_path.exists():
+                        skipped_images += 1
+                        continue
+                # Download missing image
+                img_data = await download_image_via_browser(page, img_url)
+                if img_data:
+                    file_path = save_image(img_data, next_img_idx, img_url)
+                    if file_path:
+                        image_map[img_url] = file_path
+                        next_img_idx += 1
+                        downloaded_images += 1
+                else:
+                    log(f"  Failed to download: {img_url[:80]}")
+
+        log(f"Image check complete: {total_images} total, {skipped_images} already present, {downloaded_images} downloaded")
+
+        # Save updated image map
+        with open(IMAGE_MAP_FILE, 'w') as f:
+            json.dump(image_map, f, indent=2)
 
         if browser:
             await browser.close()
