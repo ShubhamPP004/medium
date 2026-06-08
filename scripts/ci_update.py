@@ -586,6 +586,8 @@ async def main(headless=True, force_rescrape=False, chrome_path=None, skip_check
                     log(f"    → {pub_date}")
                 else:
                     log(f"    → Not found")
+                # Sleep 2s between requests to avoid rate limiting
+                await asyncio.sleep(2)
             log(f"Dates fetched: {dates_fetched}/{len(articles_without_date)}")
             # Save updated articles with dates
             with open(ARTICLES_FILE, 'w') as f:
