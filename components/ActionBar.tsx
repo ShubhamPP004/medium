@@ -1,7 +1,7 @@
 'use client';
 
 import { useState } from 'react';
-import { Download, RefreshCw, CheckCircle, AlertCircle, Loader2, Globe, FileDown, ExternalLink } from 'lucide-react';
+import { Download, RefreshCw, CheckCircle, AlertCircle, Loader2, FileDown, ExternalLink, ChevronRight, Sparkles } from 'lucide-react';
 
 interface NewArticle {
   title: string;
@@ -47,7 +47,6 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
 
       const externalUrl = data.externalUrl;
 
-      // Use File System Access API when available to let user choose overwrite
       if ('showSaveFilePicker' in window) {
         try {
           const fileRes = await fetch(externalUrl);
@@ -72,13 +71,11 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
         } catch (fsErr: any) {
           if (fsErr.name === 'AbortError') {
             setDownloading(false);
-            return; // user cancelled
+            return;
           }
-          // fall through to fallback on CORS or other errors
         }
       }
 
-      // Fallback: open in new tab (browser handles download with default behavior)
       window.open(externalUrl, '_blank');
     } catch (err) {
       setDownloadError(err instanceof Error ? err.message : 'Download failed');
@@ -90,14 +87,14 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
   const handleCheckUpdates = async () => {
     setChecking(true);
     setShowResults(true);
-    setDownloadError(null);
-    
+    setCheckResult(null);
+
     try {
       const res = await fetch('/api/check-updates');
-      const data = await res.json();
+      const data = await res.json() as CheckResult;
       setCheckResult(data);
-      
-      if (data.hasNewArticles && onRefresh) {
+
+      if (data.success && data.hasNewArticles && onRefresh) {
         onRefresh();
       }
     } catch (err) {
@@ -116,137 +113,147 @@ export default function ActionBar({ docxExists, docxSize, onRefresh }: ActionBar
     }
   };
 
-
   return (
     <div className="space-y-4">
       <div className="flex flex-col sm:flex-row gap-3">
+        {/* Download Button */}
         <button
           onClick={handleDownload}
           disabled={!docxExists || downloading}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#2E75B6] text-white font-semibold hover:bg-blue-600 transition-all disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98]"
+          className="group relative flex-1 flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold font-body text-sm transition-all duration-300 disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.97] overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(37, 99, 235, 0.25) 100%)',
+            border: '1px solid rgba(59, 130, 246, 0.3)',
+          }}
         >
-          {downloading ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <FileDown className="w-5 h-5" />
-          )}
-          <span>{downloading ? 'Downloading...' : `Download DOCX (${docxSize})`}</span>
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-[var(--accent-blue)]/10 to-[var(--accent-blue)]/5" />
+          <div className="relative z-10 flex items-center gap-2.5">
+            {downloading ? (
+              <Loader2 className="w-5 h-5 text-[var(--accent-blue)] animate-spin" />
+            ) : (
+              <FileDown className="w-5 h-5 text-[var(--accent-blue)] group-hover:translate-y-[-1px] transition-transform" />
+            )}
+            <span className="text-[var(--text-primary)]">
+              {downloading ? 'Downloading...' : `Download DOCX (${docxSize})`}
+            </span>
+          </div>
         </button>
 
+        {/* Check Updates Button */}
         <button
           onClick={handleCheckUpdates}
           disabled={checking}
-          className="flex-1 flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-emerald-600/20 text-emerald-400 border border-emerald-500/30 font-semibold hover:bg-emerald-600/30 transition-all disabled:opacity-50 active:scale-[0.98]"
+          className="group relative flex-1 flex items-center justify-center gap-2.5 px-6 py-3.5 rounded-xl font-semibold font-body text-sm transition-all duration-300 disabled:opacity-50 active:scale-[0.97] overflow-hidden"
+          style={{
+            background: 'linear-gradient(135deg, rgba(16, 185, 129, 0.1) 0%, rgba(5, 150, 105, 0.2) 100%)',
+            border: '1px solid rgba(16, 185, 129, 0.25)',
+          }}
         >
-          {checking ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
-          ) : (
-            <RefreshCw className="w-5 h-5" />
-          )}
-          <span>{checking ? 'Checking...' : 'Check for Updates'}</span>
+          <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300 bg-gradient-to-r from-[var(--accent-emerald)]/10 to-[var(--accent-emerald)]/5" />
+          <div className="relative z-10 flex items-center gap-2.5">
+            {checking ? (
+              <Loader2 className="w-5 h-5 text-[var(--accent-emerald)] animate-spin" />
+            ) : (
+              <RefreshCw className="w-5 h-5 text-[var(--accent-emerald)] group-hover:rotate-180 transition-transform duration-500" />
+            )}
+            <span className="text-[var(--text-primary)]">
+              {checking ? 'Checking...' : 'Check for Updates'}
+            </span>
+          </div>
         </button>
       </div>
 
-      <p className="text-xs text-white/40 text-center">
-        If a file with the same name exists, your browser may append &quot;(1)&quot;.
-        Modern browsers (Chrome/Edge) will open a save dialog where you can choose to overwrite.
+      <p className="text-[11px] text-[var(--text-dim)] text-center font-body leading-relaxed">
+        If a file exists with the same name, your browser may append &quot;(1)&quot;.
+        Modern browsers (Chrome/Edge) open a save dialog where you can choose to overwrite.
       </p>
 
       {downloadError && (
-        <div className="glass rounded-xl p-4 border border-red-500/20 bg-red-500/10">
+        <div className="glass rounded-xl p-4 border-l-2 border-l-[var(--accent-rose)]">
           <div className="flex items-start gap-3">
-            <AlertCircle className="w-5 h-5 text-red-400 mt-0.5 shrink-0" />
+            <AlertCircle className="w-5 h-5 text-[var(--accent-rose)] mt-0.5 shrink-0" />
             <div>
-              <p className="text-red-400 font-medium">Download Error</p>
-              <p className="text-red-400/70 text-sm mt-1">{downloadError}</p>
-              <p className="text-red-400/50 text-xs mt-2">
-                Make sure the DOCX file is in the public/ folder before deploying.
-              </p>
+              <p className="text-[var(--accent-rose)] font-medium font-body text-sm">Download Error</p>
+              <p className="text-[var(--text-muted)] text-xs mt-1 font-body">{downloadError}</p>
             </div>
           </div>
         </div>
       )}
 
       {showResults && checkResult && (
-        <div className="glass rounded-xl p-6 space-y-4 animate-fade-in-up">
+        <div className="glass rounded-xl p-5 space-y-4 border-l-2 border-l-[var(--accent-emerald)] animate-enter">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
               {checkResult.success ? (
                 checkResult.hasNewArticles ? (
                   <>
-                    <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-emerald-400" />
+                    <div className="w-9 h-9 rounded-xl bg-[var(--accent-emerald)]/10 border border-[var(--accent-emerald)]/20 flex items-center justify-center">
+                      <Sparkles className="w-4 h-4 text-[var(--accent-emerald)]" />
                     </div>
                     <div>
-                      <p className="text-emerald-400 font-medium">
+                      <p className="text-[var(--accent-emerald)] font-semibold font-body text-sm">
                         {checkResult.newCount} new article{checkResult.newCount > 1 ? 's' : ''} found!
                       </p>
-                      <p className="text-emerald-400/70 text-sm">
-                        RSS feed has {checkResult.feedCount} articles · You have {checkResult.currentCount}
+                      <p className="text-[var(--text-muted)] text-xs font-body">
+                        Feed: {checkResult.feedCount} | Stored: {checkResult.currentCount}
                       </p>
                     </div>
                   </>
                 ) : (
                   <>
-                    <div className="w-8 h-8 rounded-full bg-blue-500/20 flex items-center justify-center">
-                      <CheckCircle className="w-4 h-4 text-blue-400" />
+                    <div className="w-9 h-9 rounded-xl bg-[var(--accent-blue)]/10 border border-[var(--accent-blue)]/20 flex items-center justify-center">
+                      <CheckCircle className="w-4 h-4 text-[var(--accent-blue)]" />
                     </div>
                     <div>
-                      <p className="text-blue-400 font-medium">All articles up to date</p>
-                      <p className="text-blue-400/70 text-sm">
-                        RSS feed has {checkResult.feedCount} articles · No new articles detected
+                      <p className="text-[var(--accent-blue)] font-semibold font-body text-sm">No new articles</p>
+                      <p className="text-[var(--text-muted)] text-xs font-body">
+                        Feed: {checkResult.feedCount} | Stored: {checkResult.currentCount}
                       </p>
                     </div>
                   </>
                 )
               ) : (
                 <>
-                  <div className="w-8 h-8 rounded-full bg-red-500/20 flex items-center justify-center">
-                    <AlertCircle className="w-4 h-4 text-red-400" />
+                  <div className="w-9 h-9 rounded-xl bg-[var(--accent-rose)]/10 border border-[var(--accent-rose)]/20 flex items-center justify-center">
+                    <AlertCircle className="w-4 h-4 text-[var(--accent-rose)]" />
                   </div>
                   <div>
-                    <p className="text-red-400 font-medium">Check failed</p>
-                    <p className="text-red-400/70 text-sm">{checkResult.error}</p>
+                    <p className="text-[var(--accent-rose)] font-semibold font-body text-sm">Check failed</p>
+                    <p className="text-[var(--text-muted)] text-xs font-body">{checkResult.error}</p>
                   </div>
                 </>
               )}
             </div>
-            <button
-              onClick={() => setShowResults(false)}
-              className="text-slate-400 hover:text-white transition-colors text-sm"
-            >
-              Hide
-            </button>
+            <p className="text-[10px] text-[var(--text-dim)] font-body">
+              {new Date(checkResult.checkedAt).toLocaleTimeString()}
+            </p>
           </div>
 
-          {checkResult.hasNewArticles && checkResult.newArticles.length > 0 && (
+          {checkResult.newArticles.length > 0 && (
             <div className="space-y-2">
-              <p className="text-sm font-medium text-slate-300">New articles detected:</p>
-              <div className="space-y-2 max-h-60 overflow-y-auto">
-                {checkResult.newArticles.map((article, idx) => (
-                  <a
-                    key={idx}
-                    href={article.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex items-start gap-3 p-3 rounded-lg bg-white/5 hover:bg-white/10 transition-colors group"
-                  >
-                    <Globe className="w-4 h-4 text-slate-400 mt-0.5 shrink-0 group-hover:text-emerald-400 transition-colors" />
-                    <div className="flex-1 min-w-0">
-                      <p className="text-sm text-slate-200 group-hover:text-white transition-colors truncate">
-                        {article.title}
+              <p className="text-xs font-semibold text-[var(--text-muted)] uppercase tracking-wider font-body">New Articles</p>
+              {checkResult.newArticles.map((article, i) => (
+                <a
+                  key={i}
+                  href={article.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-3 p-3 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)] hover:border-[var(--accent-emerald)]/30 hover:bg-[var(--bg-card-hover)] transition-all group"
+                >
+                  <div className="w-7 h-7 rounded-lg bg-[var(--accent-emerald)]/10 flex items-center justify-center shrink-0">
+                    <ChevronRight className="w-4 h-4 text-[var(--accent-emerald)] group-hover:translate-x-0.5 transition-transform" />
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm text-[var(--text-primary)] font-body truncate">{article.title}</p>
+                    {article.pubDate && (
+                      <p className="text-[10px] text-[var(--text-muted)] font-body mt-0.5">
+                        {new Date(article.pubDate).toLocaleString('en-US', { month: 'short', day: 'numeric', year: 'numeric', hour: '2-digit', minute: '2-digit' })}
                       </p>
-                      {article.pubDate && (
-                        <p className="text-xs text-slate-500 mt-0.5">{article.pubDate}</p>
-                      )}
-                    </div>
-                    <ExternalLink className="w-4 h-4 text-slate-500 opacity-0 group-hover:opacity-100 transition-opacity" />
-                  </a>
-                ))}
-              </div>
-              <p className="text-xs text-slate-500 mt-2">
-                To add these articles to your DOCX, run the local auto-update script or add them manually.
-              </p>
+                    )}
+                  </div>
+                  <ExternalLink className="w-4 h-4 text-[var(--text-dim)] shrink-0 group-hover:text-[var(--accent-emerald)] transition-colors" />
+                </a>
+              ))}
             </div>
           )}
         </div>

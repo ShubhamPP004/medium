@@ -1,7 +1,7 @@
 'use client';
 
 import { useState, useMemo } from 'react';
-import { Search, Filter, ArrowUpDown, ChevronDown, ChevronUp } from 'lucide-react';
+import { Search, Filter, ArrowUpDown, ChevronDown, ChevronUp, BookX, Sparkles } from 'lucide-react';
 import ArticleCard from './ArticleCard';
 
 interface Article {
@@ -29,43 +29,29 @@ export default function ArticleList({ articles, newCount }: ArticleListProps) {
 
   const sortedArticles = useMemo(() => {
     const filtered = articles.filter((article) => {
-      const query = search.toLowerCase();
+      if (!search) return true;
+      const q = search.toLowerCase();
       return (
-        article.title.toLowerCase().includes(query) ||
-        article.byline.toLowerCase().includes(query) ||
-        article.url.toLowerCase().includes(query)
+        article.title.toLowerCase().includes(q) ||
+        article.byline?.toLowerCase().includes(q) ||
+        article.url.toLowerCase().includes(q)
       );
     });
 
     return filtered.sort((a, b) => {
-      let comparison = 0;
-      switch (sortField) {
-        case 'number': {
-          const aMatch = a.title.match(/SFMC Tips #(\d+)/);
-          const bMatch = b.title.match(/SFMC Tips #(\d+)/);
-          const aNum = aMatch ? parseInt(aMatch[1], 10) : Infinity;
-          const bNum = bMatch ? parseInt(bMatch[1], 10) : Infinity;
-          comparison = aNum - bNum;
-          if (aNum === Infinity && bNum !== Infinity) comparison = 1;
-          if (bNum === Infinity && aNum !== Infinity) comparison = -1;
-          break;
-        }
-        case 'title':
-          comparison = a.title.localeCompare(b.title);
-          break;
-        case 'date': {
-          const aDate = a.pubDate ? new Date(a.pubDate).getTime() : 0;
-          const bDate = b.pubDate ? new Date(b.pubDate).getTime() : 0;
-          // Fallback to tips number for articles without pubDate (oldest articles)
-          const aNumMatch = a.title.match(/SFMC Tips #(\d+)/);
-          const bNumMatch = b.title.match(/SFMC Tips #(\d+)/);
-          const aNum = aNumMatch ? parseInt(aNumMatch[1], 10) : 0;
-          const bNum = bNumMatch ? parseInt(bNumMatch[1], 10) : 0;
-          comparison = (aDate || aNum) - (bDate || bNum);
-          break;
-        }
+      let cmp = 0;
+      if (sortField === 'number') {
+        const na = a.title.match(/SFMC Tips #(\d+)/);
+        const nb = b.title.match(/SFMC Tips #(\d+)/);
+        cmp = (na ? parseInt(na[1]) : 0) - (nb ? parseInt(nb[1]) : 0);
+      } else if (sortField === 'title') {
+        cmp = a.title.localeCompare(b.title);
+      } else if (sortField === 'date') {
+        const da = a.pubDate ? new Date(a.pubDate).getTime() : 0;
+        const db = b.pubDate ? new Date(b.pubDate).getTime() : 0;
+        cmp = da - db;
       }
-      return sortDirection === 'asc' ? comparison : -comparison;
+      return sortDirection === 'asc' ? cmp : -cmp;
     });
   }, [articles, search, sortField, sortDirection]);
 
@@ -81,98 +67,133 @@ export default function ArticleList({ articles, newCount }: ArticleListProps) {
   const newArticles = sortedArticles.slice(0, newCount);
   const oldArticles = sortedArticles.slice(newCount);
 
+  const SortButton = ({ field, label }: { field: SortField; label: string }) => {
+    const isActive = sortField === field;
+    return (
+      <button
+        onClick={() => toggleSort(field)}
+        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all duration-200 ${
+          isActive
+            ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20'
+            : 'text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-default)] hover:text-[var(--text-secondary)] hover:border-[var(--border-hover)]'
+        }`}
+      >
+        <ArrowUpDown className="w-3 h-3" />
+        <span>{label}</span>
+        {isActive && (
+          <span className="font-mono-nums text-[10px]">{sortDirection === 'asc' ? '↑' : '↓'}</span>
+        )}
+      </button>
+    );
+  };
+
   return (
-    <div className="glass rounded-xl overflow-hidden">
-      <div className="p-5 border-b border-white/10">
+    <div className="glass rounded-xl overflow-hidden border border-[var(--border-default)]">
+      {/* Header */}
+      <div className="p-4 sm:p-5 border-b border-[var(--border-default)]">
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-3">
-            <button
-              onClick={() => setExpanded(!expanded)}
-              className="p-1.5 rounded-lg hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
-            >
-              {expanded ? <ChevronUp className="w-5 h-5" /> : <ChevronDown className="w-5 h-5" />}
-            </button>
-            <h2 className="text-xl font-bold text-white">
-              Articles
-              <span className="ml-2 text-sm font-normal text-slate-400">({sortedArticles.length} shown)</span>
-            </h2>
+            <h2 className="text-lg font-bold text-[var(--text-primary)] font-display tracking-tight">Articles</h2>
+            <span className="font-mono-nums text-xs bg-[var(--bg-surface)] border border-[var(--border-default)] text-[var(--text-muted)] px-2.5 py-1 rounded-lg">
+              {sortedArticles.length}
+            </span>
           </div>
           <button
-            onClick={() => setShowFilters(!showFilters)}
-            className="flex items-center gap-2 px-4 py-2 rounded-lg bg-white/5 hover:bg-white/10 transition-colors text-sm text-slate-300"
+            onClick={() => setExpanded(!expanded)}
+            className="p-2 rounded-lg bg-[var(--bg-surface)] border border-[var(--border-default)] hover:border-[var(--border-hover)] text-[var(--text-muted)] hover:text-[var(--text-secondary)] transition-all"
           >
-            <Filter className="w-4 h-4" />
-            Filter
+            {expanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
           </button>
         </div>
 
-        {showFilters && (
-          <div className="flex flex-col sm:flex-row gap-3 mb-2">
-            <div className="relative flex-1">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
-              <input
-                type="text"
-                placeholder="Search articles..."
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                className="w-full pl-10 pr-4 py-2.5 rounded-lg bg-white/5 border border-white/10 text-white placeholder-slate-400 focus:outline-none focus:border-blue-400/50 transition-colors"
-              />
+        {/* Search bar */}
+        <div className="relative mb-3">
+          <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[var(--text-dim)]" />
+          <input
+            type="text"
+            placeholder="Search articles, authors, or topics..."
+            value={search}
+            onChange={(e) => setSearch(e.target.value)}
+            className="w-full pl-10 pr-4 py-2.5 bg-[var(--bg-surface)] border border-[var(--border-default)] rounded-xl text-sm text-[var(--text-primary)] placeholder:text-[var(--text-dim)] focus:outline-none focus:border-[var(--accent-blue)]/30 focus:ring-1 focus:ring-[var(--accent-blue)]/20 transition-all font-body"
+          />
+        </div>
+
+        {/* Filter toggle */}
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setShowFilters(!showFilters)}
+            className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-semibold font-body transition-all ${
+              showFilters
+                ? 'bg-[var(--accent-blue)]/10 text-[var(--accent-blue)] border border-[var(--accent-blue)]/20'
+                : 'text-[var(--text-muted)] bg-[var(--bg-surface)] border border-[var(--border-default)] hover:text-[var(--text-secondary)]'
+            }`}
+          >
+            <Filter className="w-3.5 h-3.5" />
+            <span>Filters</span>
+          </button>
+          {showFilters && (
+            <div className="flex items-center gap-2 animate-enter">
+              <SortButton field="date" label="Date" />
+              <SortButton field="number" label="Number" />
+              <SortButton field="title" label="Title" />
             </div>
-            <div className="flex gap-2">
-              {(['number', 'title', 'date'] as SortField[]).map((field) => (
-                <button
-                  key={field}
-                  onClick={() => toggleSort(field)}
-                  className={`flex items-center gap-1.5 px-3 py-2.5 rounded-lg text-sm capitalize transition-colors ${
-                    sortField === field
-                      ? 'bg-blue-500/20 text-blue-400'
-                      : 'bg-white/5 text-slate-400 hover:bg-white/10'
-                  }`}
-                >
-                  <ArrowUpDown className="w-3.5 h-3.5" />
-                  {field}
-                  {sortField === field && (
-                    <span className="text-xs">{sortDirection === 'asc' ? '↑' : '↓'}</span>
-                  )}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
+          )}
+        </div>
       </div>
 
+      {/* Article list */}
       {expanded && (
-        <div className="p-4 space-y-3 max-h-[600px] overflow-y-auto">
+        <div className="divide-y divide-[var(--border-default)]">
           {sortedArticles.length === 0 ? (
-            <div className="text-center py-12 text-slate-400">No articles match your search</div>
+            <div className="p-12 text-center">
+              <div className="w-14 h-14 rounded-xl bg-[var(--bg-surface)] border border-[var(--border-default)] flex items-center justify-center mx-auto mb-4">
+                <BookX className="w-6 h-6 text-[var(--text-dim)]" />
+              </div>
+              <p className="text-[var(--text-muted)] font-body text-sm">No articles match your search</p>
+              <p className="text-[var(--text-dim)] text-xs mt-1 font-body">Try a different keyword</p>
+            </div>
           ) : (
             <>
-              {newCount > 0 && newArticles.length > 0 && (
-                <div className="mb-4">
+              {newArticles.length > 0 && (
+                <div className="p-2 sm:p-3">
                   <div className="flex items-center gap-2 mb-3 px-2">
-                    <div className="w-2 h-2 rounded-full bg-emerald-400" />
-                    <span className="text-sm font-semibold text-emerald-400">New Articles</span>
-                    <span className="text-xs text-slate-400">({newArticles.length})</span>
+                    <Sparkles className="w-3.5 h-3.5 text-[var(--accent-emerald)]" />
+                    <span className="text-xs font-semibold text-[var(--accent-emerald)] uppercase tracking-wider font-body">
+                      New Articles
+                    </span>
+                    <div className="flex-1 h-px bg-gradient-to-r from-[var(--accent-emerald)]/20 to-transparent" />
                   </div>
-                  <div className="space-y-3">
-                    {newArticles.map((article, index) => (
-                      <ArticleCard key={article.url} article={article} index={index} isNew={true} />
+                  <div className="space-y-2">
+                    {newArticles.map((article, i) => (
+                      <ArticleCard
+                        key={article.url}
+                        article={article}
+                        index={i}
+                        isNew={true}
+                      />
                     ))}
                   </div>
                 </div>
               )}
+
               {oldArticles.length > 0 && (
-                <div>
-                  {newCount > 0 && (
+                <div className="p-2 sm:p-3">
+                  {newArticles.length > 0 && (
                     <div className="flex items-center gap-2 mb-3 px-2">
-                      <div className="w-2 h-2 rounded-full bg-slate-500" />
-                      <span className="text-sm font-semibold text-slate-400">Previously Added</span>
-                      <span className="text-xs text-slate-400">({oldArticles.length})</span>
+                      <span className="text-xs font-semibold text-[var(--text-dim)] uppercase tracking-wider font-body">
+                        All Articles
+                      </span>
+                      <div className="flex-1 h-px bg-gradient-to-r from-[var(--text-dim)]/20 to-transparent" />
                     </div>
                   )}
-                  <div className="space-y-3">
-                    {oldArticles.map((article, index) => (
-                      <ArticleCard key={article.url} article={article} index={index + newCount} />
+                  <div className="space-y-2">
+                    {oldArticles.map((article, i) => (
+                      <ArticleCard
+                        key={article.url}
+                        article={article}
+                        index={i + newArticles.length}
+                        isNew={false}
+                      />
                     ))}
                   </div>
                 </div>
