@@ -37,77 +37,75 @@ export default function StatsBar({ stats }: StatsBarProps) {
       label: 'Articles',
       value: stats.total.toString(),
       suffix: stats.newCount > 0 ? `+${stats.newCount}` : '',
-      color: 'var(--accent-blue)',
-      glow: 'var(--accent-blue-glow)',
-      iconBg: 'bg-[var(--accent-blue)]/10',
-      borderColor: 'border-[var(--accent-blue)]/20',
+      accent: 'var(--accent-blue)',
+      accentText: 'var(--accent-blue)',
+      accentMuted: 'var(--accent-blue-muted)',
+      accentBorder: 'var(--accent-blue-border)',
     },
     {
       icon: Image,
       label: 'Images',
       value: stats.imageCount.toLocaleString(),
       suffix: '',
-      color: 'var(--accent-emerald)',
-      glow: 'var(--accent-emerald-glow)',
-      iconBg: 'bg-[var(--accent-emerald)]/10',
-      borderColor: 'border-[var(--accent-emerald)]/20',
+      accent: 'var(--accent-emerald)',
+      accentText: 'var(--accent-emerald-text)',
+      accentMuted: 'var(--accent-emerald-muted)',
+      accentBorder: 'var(--accent-emerald-border)',
     },
     {
       icon: Download,
       label: 'DOCX Size',
       value: stats.docxSize || 'N/A',
       suffix: '',
-      color: 'var(--accent-amber)',
-      glow: 'var(--accent-amber-glow)',
-      iconBg: 'bg-[var(--accent-amber)]/10',
-      borderColor: 'border-[var(--accent-amber)]/20',
+      accent: 'var(--accent-amber)',
+      accentText: 'var(--accent-amber-text)',
+      accentMuted: 'var(--accent-amber-muted)',
+      accentBorder: 'var(--accent-amber-border)',
     },
     {
       icon: Clock,
       label: 'Last Update',
       value: timeAgo,
       suffix: '',
-      color: 'var(--text-muted)',
-      glow: 'transparent',
-      iconBg: 'bg-[var(--text-dim)]/20',
-      borderColor: 'border-[var(--border-default)]',
+      accent: 'var(--text-muted)',
+      accentText: 'var(--text-muted)',
+      accentMuted: 'var(--bg-elevated)',
+      accentBorder: 'var(--border-default)',
     },
   ];
 
   return (
     <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-      {items.map((item, i) => {
+      {items.map((item) => {
         const Icon = item.icon;
         return (
           <div
             key={item.label}
-            className="group relative glass rounded-xl p-5 transition-all duration-300 hover:border-[var(--border-hover)] overflow-hidden"
-            style={{ animationDelay: `${i * 0.1}s` }}
+            className="card card-hover rounded-xl p-5 group"
           >
-            {/* Hover glow */}
-            <div
-              className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 rounded-xl"
-              style={{ boxShadow: `inset 0 0 40px ${item.glow}` }}
-            />
-
-            <div className="relative z-10">
-              <div className="flex items-center justify-between mb-4">
-                <div className={`${item.iconBg} ${item.borderColor} border p-2 rounded-lg transition-all duration-300 group-hover:scale-110`}>
-                  <Icon className="w-5 h-5" style={{ color: item.color }} />
-                </div>
-                {item.suffix && (
-                  <span className="flex items-center gap-1 text-xs font-semibold text-[var(--accent-emerald)] bg-[var(--accent-emerald)]/10 px-2.5 py-1 rounded-full border border-[var(--accent-emerald)]/20">
-                    <TrendingUp className="w-3 h-3" />
-                    {item.suffix}
-                  </span>
-                )}
+            <div className="flex items-center justify-between mb-4">
+              <div
+                className="p-2 rounded-lg border transition-colors duration-200"
+                style={{
+                  background: item.accentMuted,
+                  borderColor: item.accentBorder,
+                  color: item.accentText,
+                }}
+              >
+                <Icon className="w-5 h-5" />
               </div>
-              <div className="font-mono-nums text-2xl font-bold text-[var(--text-primary)] mb-1 tracking-tight">
-                {item.value}
-              </div>
-              <div className="text-xs font-body text-[var(--text-muted)] tracking-wide uppercase">
-                {item.label}
-              </div>
+              {item.suffix && (
+                <span className="flex items-center gap-1 text-[10px] font-bold text-[var(--accent-emerald)] bg-[var(--accent-emerald-muted)] px-2 py-1 rounded-full border border-[var(--accent-emerald-border)] font-body">
+                  <TrendingUp className="w-3 h-3" />
+                  {item.suffix}
+                </span>
+              )}
+            </div>
+            <div className="font-mono-nums text-2xl font-bold text-[var(--text-primary)] mb-1 tracking-tight">
+              {item.value}
+            </div>
+            <div className="text-[11px] font-body text-[var(--text-muted)] tracking-wider uppercase">
+              {item.label}
             </div>
           </div>
         );
